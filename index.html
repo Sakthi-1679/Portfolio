@@ -1,0 +1,2191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAKTHIVEL R — Software Engineer</title>
+
+<!-- PERF: preconnect + non-blocking font load (replaces render-blocking @import) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;500&display=swap">
+
+<!-- PERF: importmap for the real-time 3D layer (Three.js, loaded from CDN, module-scoped) -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<style>
+  :root {
+    --neon-blue: #00d4ff;
+    --neon-cyan: #00fff5;
+    --electric-purple: #7c3aed;
+    --plasma-purple: #a855f7;
+    --neon-green: #00ff88;
+    --dark-bg: #020408;
+    --dark-surface: #050d1a;
+    --glass: rgba(0,212,255,0.05);
+    --glass-border: rgba(0,212,255,0.15);
+    --text-primary: #e8f4ff;
+    --text-secondary: rgba(232,244,255,0.6);
+    --accent: #00d4ff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--dark-bg);
+    color: var(--text-primary);
+    font-family: 'Space Grotesk', sans-serif;
+    overflow-x: hidden;
+    cursor: none;
+  }
+
+  /* CUSTOM CURSOR */
+  #cursor {
+    position: fixed;
+    width: 12px; height: 12px;
+    background: var(--neon-cyan);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    mix-blend-mode: screen;
+    transition: transform 0.1s ease;
+    box-shadow: 0 0 20px var(--neon-cyan), 0 0 40px rgba(0,255,245,0.4);
+  }
+  #cursor-ring {
+    position: fixed;
+    width: 40px; height: 40px;
+    border: 1px solid rgba(0,212,255,0.5);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9998;
+    transition: transform 0.15s ease, width 0.3s, height 0.3s;
+  }
+
+  /* CANVAS BACKGROUND */
+  #bg-canvas, #bg-canvas-3d {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+  /* Legacy 2D particle canvas only shown as a WebGL-unsupported fallback */
+  #bg-canvas { display: none; }
+
+  /* SCROLL-DRIVEN 3D STAGE (hero) — CSS-only, GPU-composited, no per-frame JS layout cost */
+  .scroll-3d-stage {
+    perspective: 1400px;
+    perspective-origin: 50% 30%;
+  }
+  .scroll-3d-layer {
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+
+  /* NAV */
+  nav {
+    position: fixed;
+    top: 0; width: 100%;
+    z-index: 1000;
+    padding: 20px 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(2,4,8,0.75);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--glass-border);
+  }
+
+  .nav-logo {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 18px;
+    font-weight: 900;
+    color: var(--neon-cyan);
+    letter-spacing: 4px;
+    text-shadow: 0 0 20px var(--neon-cyan);
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 40px;
+    list-style: none;
+  }
+
+  .nav-links a {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: color 0.3s, text-shadow 0.3s;
+    position: relative;
+  }
+
+  .nav-links a::after {
+    content: '';
+    position: absolute;
+    bottom: -4px; left: 0;
+    width: 0; height: 1px;
+    background: var(--neon-cyan);
+    box-shadow: 0 0 10px var(--neon-cyan);
+    transition: width 0.3s;
+  }
+
+  .nav-links a:hover {
+    color: var(--neon-cyan);
+    text-shadow: 0 0 10px var(--neon-cyan);
+  }
+
+  .nav-links a:hover::after { width: 100%; }
+
+  /* SECTIONS */
+  section {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+  }
+
+  /* HERO */
+  #hero {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    min-height: 100vh;
+    padding: 120px 40px 80px;
+    overflow: hidden;
+  }
+
+  .hero-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: var(--neon-cyan);
+    margin-bottom: 24px;
+    opacity: 0;
+    animation: fadeUp 1s ease 0.5s forwards;
+  }
+
+  .hero-name {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(48px, 8vw, 120px);
+    font-weight: 900;
+    letter-spacing: 8px;
+    line-height: 1;
+    background: linear-gradient(135deg, #ffffff 0%, var(--neon-cyan) 50%, var(--plasma-purple) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: none;
+    filter: drop-shadow(0 0 40px rgba(0,212,255,0.5));
+    opacity: 0;
+    animation: fadeUp 1.2s ease 0.8s forwards, glowPulse 4s ease-in-out 2s infinite;
+    position: relative;
+  }
+
+  .hero-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(16px, 2.5vw, 22px);
+    font-weight: 300;
+    letter-spacing: 4px;
+    color: var(--text-secondary);
+    margin-top: 20px;
+    opacity: 0;
+    animation: fadeUp 1s ease 1.2s forwards;
+  }
+
+  .hero-title span {
+    color: var(--neon-cyan);
+    font-weight: 500;
+  }
+
+  .hero-tagline {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--neon-green);
+    margin-top: 16px;
+    opacity: 0;
+    animation: fadeUp 1s ease 1.5s forwards;
+    letter-spacing: 2px;
+  }
+
+  .hero-cta {
+    display: flex;
+    gap: 20px;
+    margin-top: 60px;
+    opacity: 0;
+    animation: fadeUp 1s ease 1.8s forwards;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .btn-primary {
+    padding: 16px 48px;
+    background: linear-gradient(135deg, var(--neon-blue), var(--electric-purple));
+    border: none;
+    border-radius: 2px;
+    color: white;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 12px;
+    letter-spacing: 3px;
+    cursor: none;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s, box-shadow 0.3s;
+    text-decoration: none;
+    display: inline-block;
+  }
+
+  .btn-primary::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    background: linear-gradient(135deg, var(--neon-cyan), var(--plasma-purple), var(--neon-cyan));
+    border-radius: 2px;
+    z-index: -1;
+    animation: borderRotate 3s linear infinite;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .btn-primary:hover::before { opacity: 1; }
+
+  .btn-primary:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 20px 60px rgba(0,212,255,0.4);
+  }
+
+  .btn-ghost {
+    padding: 16px 48px;
+    background: transparent;
+    border: 1px solid var(--glass-border);
+    border-radius: 2px;
+    color: var(--text-primary);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 12px;
+    letter-spacing: 3px;
+    cursor: none;
+    transition: border-color 0.3s, color 0.3s, box-shadow 0.3s, transform 0.3s;
+    text-decoration: none;
+    display: inline-block;
+    backdrop-filter: blur(10px);
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+    box-shadow: 0 0 30px rgba(0,212,255,0.2), inset 0 0 30px rgba(0,212,255,0.05);
+    transform: translateY(-3px);
+  }
+
+  /* SCROLL INDICATOR */
+  .scroll-indicator {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    opacity: 0;
+    animation: fadeIn 1s ease 2.5s forwards;
+  }
+
+  .scroll-indicator span {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 4px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+  }
+
+  .scroll-line {
+    width: 1px;
+    height: 60px;
+    background: linear-gradient(to bottom, var(--neon-cyan), transparent);
+    animation: scrollPulse 2s ease-in-out infinite;
+  }
+
+  /* SECTION STYLES */
+  .section-wrapper {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 120px 60px;
+  }
+
+  .section-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: var(--neon-cyan);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .section-eyebrow::after {
+    content: '';
+    flex: 1;
+    max-width: 60px;
+    height: 1px;
+    background: linear-gradient(to right, var(--neon-cyan), transparent);
+  }
+
+  .section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(32px, 5vw, 64px);
+    font-weight: 700;
+    line-height: 1.1;
+    margin-bottom: 20px;
+  }
+
+  .section-title .accent { color: var(--neon-cyan); }
+
+  .section-subtitle {
+    font-size: 16px;
+    color: var(--text-secondary);
+    max-width: 600px;
+    line-height: 1.7;
+  }
+
+  /* GLASS CARD */
+  .glass-card {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 4px;
+    backdrop-filter: blur(8px);
+    transition: border-color 0.3s, box-shadow 0.3s, transform 0.4s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .glass-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0,212,255,0.05), transparent);
+    transition: left 0.6s ease;
+  }
+
+  .glass-card:hover::before { left: 100%; }
+
+  .glass-card:hover {
+    border-color: rgba(0,212,255,0.4);
+    box-shadow: 0 0 40px rgba(0,212,255,0.1), 0 20px 60px rgba(0,0,0,0.4);
+    transform: translateY(-4px);
+  }
+
+  /* ABOUT SECTION */
+  #about { background: transparent; }
+
+  .about-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: center;
+    margin-top: 60px;
+  }
+
+  .about-text p {
+    color: var(--text-secondary);
+    line-height: 1.8;
+    margin-bottom: 20px;
+    font-size: 15px;
+  }
+
+  .about-text p strong {
+    color: var(--neon-cyan);
+    font-weight: 600;
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 40px;
+  }
+
+  .stat-item {
+    padding: 24px;
+  }
+
+  .stat-num {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 36px;
+    font-weight: 900;
+    color: var(--neon-cyan);
+    line-height: 1;
+    text-shadow: 0 0 20px rgba(0,212,255,0.5);
+  }
+
+  .stat-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-top: 8px;
+  }
+
+  .about-highlights {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .highlight-item {
+    padding: 28px;
+    position: relative;
+  }
+
+  .highlight-item .hi-icon {
+    font-size: 28px;
+    margin-bottom: 12px;
+  }
+
+  .highlight-item h3 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+
+  .highlight-item p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  .hi-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    background: rgba(0,212,255,0.1);
+    border: 1px solid rgba(0,212,255,0.3);
+    border-radius: 2px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--neon-cyan);
+    text-transform: uppercase;
+    margin-top: 10px;
+  }
+
+  /* SKILLS SECTION */
+  #skills { background: transparent; }
+
+  .skills-canvas-wrapper {
+    position: relative;
+    height: 500px;
+    margin: 60px 0 40px;
+    border: 1px solid var(--glass-border);
+    border-radius: 4px;
+    overflow: hidden;
+    background: rgba(0,212,255,0.02);
+  }
+
+  #skills-canvas { width: 100%; height: 100%; }
+
+  .skills-detail {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+    margin-top: 40px;
+  }
+
+  .skill-chip {
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    cursor: none;
+    transition: all 0.3s;
+  }
+
+  .skill-chip-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+    letter-spacing: 1px;
+  }
+
+  .skill-chip-bar {
+    height: 2px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+
+  .skill-chip-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--plasma-purple));
+    border-radius: 1px;
+    transform-origin: left;
+    transform: scaleX(0);
+    transition: transform 1s ease;
+    box-shadow: 0 0 10px rgba(0,212,255,0.5);
+  }
+
+  .skill-chip-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--neon-cyan);
+    text-align: right;
+  }
+
+  .skill-chip:hover { border-color: rgba(0,212,255,0.5); }
+  .skill-chip:hover .skill-chip-name { color: var(--neon-cyan); }
+
+  /* EXPERIENCE SECTION */
+  #experience { background: transparent; }
+
+  .timeline {
+    position: relative;
+    margin-top: 60px;
+    padding-left: 60px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 20px; top: 0; bottom: 0;
+    width: 1px;
+    background: linear-gradient(to bottom, transparent, var(--neon-cyan), var(--plasma-purple), transparent);
+  }
+
+  .timeline-item {
+    position: relative;
+    margin-bottom: 60px;
+    opacity: 0;
+    transform: translateX(-30px);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+  }
+
+  .timeline-item.visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .timeline-dot {
+    position: absolute;
+    left: -48px;
+    top: 8px;
+    width: 16px; height: 16px;
+    border: 2px solid var(--neon-cyan);
+    border-radius: 50%;
+    background: var(--dark-bg);
+    box-shadow: 0 0 20px rgba(0,212,255,0.5);
+    animation: dotPulse 2s ease-in-out infinite;
+  }
+
+  .timeline-dot::before {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    background: var(--neon-cyan);
+    border-radius: 50%;
+  }
+
+  .timeline-meta {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .timeline-date {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--neon-cyan);
+    text-transform: uppercase;
+  }
+
+  .timeline-type {
+    padding: 3px 12px;
+    background: rgba(124,58,237,0.2);
+    border: 1px solid rgba(124,58,237,0.4);
+    border-radius: 2px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--plasma-purple);
+    text-transform: uppercase;
+  }
+
+  .timeline-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+    letter-spacing: 1px;
+  }
+
+  .timeline-company {
+    font-size: 14px;
+    color: var(--neon-cyan);
+    margin-bottom: 16px;
+    font-weight: 500;
+  }
+
+  .timeline-desc {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    margin-bottom: 16px;
+  }
+
+  .tech-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .tech-tag {
+    padding: 4px 12px;
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 2px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+    transition: all 0.3s;
+  }
+
+  .tech-tag:hover {
+    background: rgba(0,212,255,0.15);
+    border-color: rgba(0,212,255,0.5);
+    color: var(--neon-cyan);
+  }
+
+  /* PROJECTS SECTION */
+  #projects { background: transparent; }
+
+  .projects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 30px;
+    margin-top: 60px;
+  }
+
+  .project-card {
+    padding: 0;
+    overflow: hidden;
+    cursor: none;
+  }
+
+  .project-header {
+    position: relative;
+    height: 220px;
+    overflow: hidden;
+  }
+
+  .project-canvas {
+    width: 100%; height: 100%;
+    display: block;
+  }
+
+  .project-label {
+    position: absolute;
+    top: 20px; left: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--neon-cyan);
+    background: rgba(0,212,255,0.1);
+    border: 1px solid rgba(0,212,255,0.3);
+    padding: 4px 12px;
+  }
+
+  .project-body {
+    padding: 28px;
+  }
+
+  .project-name {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+
+  .project-event {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--plasma-purple);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .project-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    margin-bottom: 20px;
+  }
+
+  .project-metric {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .metric-val {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--neon-green);
+    text-shadow: 0 0 20px rgba(0,255,136,0.5);
+    line-height: 1;
+  }
+
+  .metric-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+
+  /* AWARDS SECTION */
+  #awards { background: transparent; }
+
+  .awards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 24px;
+    margin-top: 60px;
+  }
+
+  .award-card {
+    padding: 32px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .award-card::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 80px; height: 80px;
+    background: radial-gradient(circle at top right, rgba(0,212,255,0.1), transparent);
+  }
+
+  .award-icon {
+    font-size: 40px;
+    margin-bottom: 16px;
+    filter: drop-shadow(0 0 10px rgba(255,200,0,0.5));
+  }
+
+  .award-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+
+  .award-event {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--neon-cyan);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .award-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  /* CONTACT SECTION */
+  #contact {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 120px 40px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #contact-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+  }
+
+  .contact-content { position: relative; z-index: 2; }
+
+  .contact-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(36px, 6vw, 80px);
+    font-weight: 900;
+    letter-spacing: 4px;
+    margin-bottom: 20px;
+    background: linear-gradient(135deg, #fff, var(--neon-cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .contact-sub {
+    font-size: 16px;
+    color: var(--text-secondary);
+    max-width: 500px;
+    line-height: 1.7;
+    margin: 0 auto 60px;
+  }
+
+  .contact-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+    margin-bottom: 60px;
+  }
+
+  .contact-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 32px;
+    text-decoration: none;
+    transition: all 0.3s;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+
+  .contact-link:hover {
+    color: var(--neon-cyan);
+    box-shadow: 0 0 40px rgba(0,212,255,0.2), inset 0 0 40px rgba(0,212,255,0.05);
+    border-color: rgba(0,212,255,0.5);
+    transform: translateY(-4px);
+  }
+
+  .contact-link .cl-icon { font-size: 20px; }
+
+  .contact-info {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+  }
+
+  .contact-info span {
+    color: var(--neon-cyan);
+  }
+
+  /* FOOTER */
+  footer {
+    border-top: 1px solid var(--glass-border);
+    padding: 40px 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    z-index: 2;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+
+  .footer-logo {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    font-weight: 900;
+    color: var(--neon-cyan);
+    letter-spacing: 4px;
+    text-shadow: 0 0 20px rgba(0,212,255,0.4);
+  }
+
+  .footer-copy {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--text-secondary);
+  }
+
+  /* DIVIDER */
+  .section-divider {
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0,212,255,0.2), rgba(124,58,237,0.2), transparent);
+    position: relative;
+    z-index: 1;
+  }
+
+  /* LOADING SCREEN */
+  #loader {
+    position: fixed;
+    inset: 0;
+    background: var(--dark-bg);
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 30px;
+    transition: opacity 0.8s ease, visibility 0.8s ease;
+  }
+
+  #loader.hidden { opacity: 0; visibility: hidden; }
+
+  .loader-name {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(24px, 5vw, 48px);
+    font-weight: 900;
+    letter-spacing: 8px;
+    background: linear-gradient(135deg, #fff, var(--neon-cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: loaderPulse 1.5s ease-in-out infinite;
+  }
+
+  .loader-bar-wrap {
+    width: 300px;
+    height: 2px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+
+  .loader-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--plasma-purple));
+    width: 0%;
+    animation: loadFill 2s ease forwards;
+    box-shadow: 0 0 10px var(--neon-cyan);
+  }
+
+  .loader-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+  }
+
+  /* ANIMATIONS */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes glowPulse {
+    0%, 100% { filter: drop-shadow(0 0 40px rgba(0,212,255,0.5)); }
+    50% { filter: drop-shadow(0 0 80px rgba(0,212,255,0.8)) drop-shadow(0 0 120px rgba(168,85,247,0.3)); }
+  }
+
+  @keyframes scrollPulse {
+    0%, 100% { opacity: 0.4; transform: scaleY(0.8); }
+    50% { opacity: 1; transform: scaleY(1); }
+  }
+
+  @keyframes dotPulse {
+    0%, 100% { box-shadow: 0 0 10px rgba(0,212,255,0.5); }
+    50% { box-shadow: 0 0 30px rgba(0,212,255,0.9); }
+  }
+
+  @keyframes borderRotate {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 400% 50%; }
+  }
+
+  @keyframes loadFill {
+    0% { width: 0%; }
+    100% { width: 100%; }
+  }
+
+  @keyframes loaderPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-12px); }
+  }
+
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  /* REVEAL */
+  .reveal {
+    opacity: 0;
+    transform: translateY(40px);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+  }
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* SKILLS CANVAS LEGEND */
+  .canvas-legend {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: rgba(0,212,255,0.5);
+    text-transform: uppercase;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 900px) {
+    nav { padding: 16px 24px; }
+    .nav-links { gap: 20px; }
+    .section-wrapper { padding: 80px 24px; }
+    .about-grid { grid-template-columns: 1fr; gap: 40px; }
+    .projects-grid { grid-template-columns: 1fr; }
+    footer { padding: 30px 24px; }
+    .nav-links li:nth-child(n+4) { display: none; }
+  }
+
+  @media (max-width: 600px) {
+    .nav-links { display: none; }
+    .stat-grid { grid-template-columns: 1fr 1fr; }
+    .skills-canvas-wrapper { height: 300px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="loader-name">SAKTHIVEL R</div>
+  <div class="loader-bar-wrap"><div class="loader-bar"></div></div>
+  <div class="loader-status" id="loader-status">Initializing Systems...</div>
+</div>
+
+<!-- CURSOR -->
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+
+<!-- BG CANVAS: real-time 3D (Three.js) with a 2D fallback for unsupported browsers -->
+<canvas id="bg-canvas-3d"></canvas>
+<canvas id="bg-canvas"></canvas>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">SR</div>
+  <ul class="nav-links">
+    <li><a href="#about">About</a></li>
+    <li><a href="#skills">Skills</a></li>
+    <li><a href="#experience">Experience</a></li>
+    <li><a href="#projects">Projects</a></li>
+    <li><a href="#awards">Awards</a></li>
+    <li><a href="#contact">Contact</a></li>
+    <li><a href="Sakthivel_R_Resume_Java.pdf" download="Sakthivel_R_Resume_Java.pdf" target="_blank">Resume</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section id="hero" class="scroll-3d-stage">
+  <div class="scroll-3d-layer" id="heroTiltLayer">
+    <div class="hero-eyebrow">// Full-Stack · AI/ML · Java Specialist</div>
+    <h1 class="hero-name">SAKTHIVEL R</h1>
+    <p class="hero-title">
+      <span>Software Engineer</span> &nbsp;·&nbsp; AI Engineer &nbsp;·&nbsp; Full-Stack Developer
+    </p>
+    <p class="hero-tagline">&gt; CS Graduate · National Hackathon Finalist · Open to Relocate</p>
+    <div class="hero-cta">
+      <a href="#projects" class="btn-primary">VIEW PROJECTS</a>
+      <a href="Sakthivel_R_Resume_Java.pdf" download="Sakthivel_R_Resume_Java.pdf" class="btn-primary">DOWNLOAD RESUME</a>
+      <a href="#contact" class="btn-ghost">GET IN TOUCH</a>
+    </div>
+  </div>
+  <div class="scroll-indicator">
+    <span>Scroll</span>
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ABOUT -->
+<section id="about">
+  <div class="section-wrapper">
+    <div class="section-eyebrow">01 — Profile</div>
+    <h2 class="section-title reveal">Engineering the <span class="accent">Future</span></h2>
+    <div class="about-grid">
+      <div class="about-text reveal">
+        <p>
+          CS graduate from <strong>PT Lee Chengalvaraya Naicker College of Engineering</strong> (CGPA: 7.97/10) with proven full-stack and AI/ML engineering experience. I build production-ready systems — not prototypes.
+        </p>
+        <p>
+          As a <strong>Freelance Web Developer</strong>, I shipped a complete e-learning platform for an IIT-JEE/NEET coaching institute — live, serving real students — with <strong>Google OAuth, Razorpay payments, GCP backend, and real-time analytics</strong>.
+        </p>
+        <p>
+          As a <strong>Full-Stack Java Trainee at QSpiders</strong>, I'm deepening enterprise-grade Java microservices development with Spring Boot, Docker, and CI/CD pipelines using GitHub Actions.
+        </p>
+        <p>
+          My AI/ML work — from NLP cybercrime classifiers to emotion-based CNN models — has reached <strong>national hackathon finals</strong> and been presented to government stakeholders.
+        </p>
+        <div class="stat-grid">
+          <div class="stat-item glass-card">
+            <div class="stat-num" data-count="90">0</div>
+            <div class="stat-label">% AI Accuracy</div>
+          </div>
+          <div class="stat-item glass-card">
+            <div class="stat-num" data-count="3">0</div>
+            <div class="stat-label">Live Projects</div>
+          </div>
+          <div class="stat-item glass-card">
+            <div class="stat-num" data-count="2">0</div>
+            <div class="stat-label">National Finals</div>
+          </div>
+          <div class="stat-item glass-card">
+            <div class="stat-num" data-count="15">0</div>
+            <div class="stat-label">+ Technologies</div>
+          </div>
+        </div>
+      </div>
+      <div class="about-highlights reveal">
+        <div class="highlight-item glass-card">
+          <div class="hi-icon">🎓</div>
+          <h3>Education</h3>
+          <p>B.E. Computer Science & Engineering · 2022–2026 · PT Lee Chengalvaraya Naicker College of Engineering & Technology</p>
+          <div class="hi-badge">CGPA 7.97 / 10.0</div>
+        </div>
+        <div class="highlight-item glass-card">
+          <div class="hi-icon">🏆</div>
+          <h3>National Hackathon Finalist</h3>
+          <p>I4C/MHA New Delhi — built a cybercrime NLP classifier achieving 90%+ accuracy and presented to government cybersecurity stakeholders.</p>
+          <div class="hi-badge">Round 2 Qualifier</div>
+        </div>
+        <div class="highlight-item glass-card">
+          <div class="hi-icon">🚀</div>
+          <h3>Freelance Delivery</h3>
+          <p>Independently delivered Instil Academy — a production e-learning platform serving live IIT-JEE/NEET students with payments and analytics.</p>
+          <div class="hi-badge">Live in Production</div>
+        </div>
+        <div class="highlight-item glass-card">
+          <div class="hi-icon">📍</div>
+          <h3>Location & Availability</h3>
+          <p>Tamil Nadu, India · Open to Relocate · Available for full-time software engineering roles</p>
+          <div class="hi-badge">Open to Relocate</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- SKILLS -->
+<section id="skills">
+  <div class="section-wrapper">
+    <div class="section-eyebrow">02 — Arsenal</div>
+    <h2 class="section-title reveal">Technical <span class="accent">Stack</span></h2>
+    <p class="section-subtitle reveal">Spanning backend systems, AI/ML pipelines, cloud infrastructure, and frontend experiences.</p>
+
+    <div class="skills-canvas-wrapper reveal">
+      <canvas id="skills-canvas"></canvas>
+      <div class="canvas-legend">Interactive — hover to explore</div>
+    </div>
+
+    <div class="skills-detail">
+      <!-- generated by JS -->
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- EXPERIENCE -->
+<section id="experience">
+  <div class="section-wrapper">
+    <div class="section-eyebrow">03 — Journey</div>
+    <h2 class="section-title reveal">Experience &amp; <span class="accent">Timeline</span></h2>
+
+    <div class="timeline">
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="glass-card" style="padding:28px;">
+          <div class="timeline-meta">
+            <span class="timeline-date">Apr 2025 – Jun 2026</span>
+            <span class="timeline-type">Freelance</span>
+          </div>
+          <div class="timeline-title">Freelance Web Developer</div>
+          <div class="timeline-company">Instil Academy — IIT-JEE/NEET E-Learning Platform</div>
+          <div class="timeline-desc">
+            Designed and delivered a complete full-stack e-learning platform actively serving students. Built secure RESTful backend with Node.js/Express, Prisma/MySQL, and Google OAuth; deployed on Google Cloud Platform. Integrated Razorpay payment gateway and developed admin dashboard for student and course management on Vercel. Implemented timed online test module with real-time scoring, leaderboards, and analytics.
+          </div>
+          <div class="tech-tags">
+            <span class="tech-tag">React</span><span class="tech-tag">Vite</span><span class="tech-tag">Node.js</span><span class="tech-tag">Express</span><span class="tech-tag">MySQL</span><span class="tech-tag">Prisma ORM</span><span class="tech-tag">Google OAuth</span><span class="tech-tag">Razorpay</span><span class="tech-tag">JWT</span><span class="tech-tag">GCP</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="glass-card" style="padding:28px;">
+          <div class="timeline-meta">
+            <span class="timeline-date">Jan 2026 – Present</span>
+            <span class="timeline-type">Training</span>
+          </div>
+          <div class="timeline-title">Full-Stack Java Trainee</div>
+          <div class="timeline-company">QSpiders — Chennai</div>
+          <div class="timeline-desc">
+            Developing modular Spring Boot microservices applying SOLID principles, design patterns, and MVC architecture. Integrating responsive web front-ends with Java backends via JDBC and containerizing services using Docker. Configuring CI/CD pipelines using GitHub Actions for automated build/deployment and version control with Git.
+          </div>
+          <div class="tech-tags">
+            <span class="tech-tag">Core Java</span><span class="tech-tag">Spring Boot</span><span class="tech-tag">REST APIs</span><span class="tech-tag">JDBC</span><span class="tech-tag">Maven</span><span class="tech-tag">MySQL</span><span class="tech-tag">Docker</span><span class="tech-tag">GitHub Actions</span><span class="tech-tag">Agile/Scrum</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="glass-card" style="padding:28px;">
+          <div class="timeline-meta">
+            <span class="timeline-date">2022 – 2026</span>
+            <span class="timeline-type">Education</span>
+          </div>
+          <div class="timeline-title">B.E. Computer Science & Engineering</div>
+          <div class="timeline-company">PT Lee Chengalvaraya Naicker College of Engineering & Technology</div>
+          <div class="timeline-desc">
+            Four-year degree with focus on software engineering, artificial intelligence, and systems design. Graduated with CGPA 7.97/10 while building multiple production-ready AI/ML and full-stack systems independently.
+          </div>
+          <div class="tech-tags">
+            <span class="tech-tag">Data Structures</span><span class="tech-tag">Algorithms</span><span class="tech-tag">Operating Systems</span><span class="tech-tag">Machine Learning</span><span class="tech-tag">Database Systems</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- PROJECTS -->
+<section id="projects">
+  <div class="section-wrapper">
+    <div class="section-eyebrow">04 — Work</div>
+    <h2 class="section-title reveal">Featured <span class="accent">Projects</span></h2>
+    <p class="section-subtitle reveal">Production-grade systems built independently — each solving a real problem.</p>
+
+    <div class="projects-grid">
+
+      <!-- Project 1 -->
+      <div class="project-card glass-card reveal">
+        <div class="project-header">
+          <canvas class="project-canvas" id="proj-canvas-1"></canvas>
+          <div class="project-label">Hackathon · National</div>
+        </div>
+        <div class="project-body">
+          <div class="project-name">Cybercrime Report Classification</div>
+          <div class="project-event">I4C National Hackathon — New Delhi 2025</div>
+          <div class="project-metric">
+            <div>
+              <div class="metric-val">90%+</div>
+              <div class="metric-label">NLP Accuracy</div>
+            </div>
+          </div>
+          <p class="project-desc">
+            End-to-end NLP text-classification pipeline using TF-IDF and scikit-learn to classify cybercrime report categories. Deployed via FastAPI REST endpoint. Presented to cybersecurity stakeholders at I4C/MHA New Delhi. Advanced as Round 2 National Qualifier.
+          </p>
+          <div class="tech-tags">
+            <span class="tech-tag">Python</span><span class="tech-tag">NLP</span><span class="tech-tag">TF-IDF</span><span class="tech-tag">scikit-learn</span><span class="tech-tag">FastAPI</span><span class="tech-tag">MySQL</span><span class="tech-tag">REST API</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Project 2 -->
+      <div class="project-card glass-card reveal">
+        <div class="project-header">
+          <canvas class="project-canvas" id="proj-canvas-2"></canvas>
+          <div class="project-label">Final Year · AI/ML</div>
+        </div>
+        <div class="project-body">
+          <div class="project-name">Emotion-Based Movie Recommendation</div>
+          <div class="project-event">Final Year Project — 2026</div>
+          <div class="project-metric">
+            <div>
+              <div class="metric-val">90%+</div>
+              <div class="metric-label">Emotion Accuracy</div>
+            </div>
+          </div>
+          <p class="project-desc">
+            4-layer AI architecture combining a custom CNN model for facial emotion recognition via OpenCV real-time inference with a FastAPI backend and MySQL recommendation engine. Achieves 90%+ accuracy in classifying 7 emotional states to surface personalized movie picks.
+          </p>
+          <div class="tech-tags">
+            <span class="tech-tag">TensorFlow</span><span class="tech-tag">Keras</span><span class="tech-tag">OpenCV</span><span class="tech-tag">CNN</span><span class="tech-tag">FastAPI</span><span class="tech-tag">MySQL</span><span class="tech-tag">Docker</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Project 3 -->
+      <div class="project-card glass-card reveal">
+        <div class="project-header">
+          <canvas class="project-canvas" id="proj-canvas-3"></canvas>
+          <div class="project-label">Freelance · Production</div>
+        </div>
+        <div class="project-body">
+          <div class="project-name">Instil Academy — E-Learning Platform</div>
+          <div class="project-event">Freelance Delivery · Live in Production</div>
+          <div class="project-metric">
+            <div>
+              <div class="metric-val">LIVE</div>
+              <div class="metric-label">Active Students</div>
+            </div>
+          </div>
+          <p class="project-desc">
+            Full-stack e-learning platform for IIT-JEE/NEET coaching institute. Features Google OAuth auth, Razorpay payment gateway, timed test modules with real-time scoring and leaderboards, admin dashboard for course/student management, and backend deployed on Google Cloud Platform.
+          </p>
+          <div class="tech-tags">
+            <span class="tech-tag">React</span><span class="tech-tag">Node.js</span><span class="tech-tag">Express</span><span class="tech-tag">MySQL</span><span class="tech-tag">Prisma</span><span class="tech-tag">GCP</span><span class="tech-tag">Razorpay</span><span class="tech-tag">Vercel</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- AWARDS -->
+<section id="awards">
+  <div class="section-wrapper">
+    <div class="section-eyebrow">05 — Recognition</div>
+    <h2 class="section-title reveal">Awards &amp; <span class="accent">Certifications</span></h2>
+
+    <div class="awards-grid">
+      <div class="award-card glass-card reveal">
+        <div class="award-icon">🥇</div>
+        <div class="award-title">National Finalist</div>
+        <div class="award-event">Odoo Hackathon 2025</div>
+        <p class="award-desc">Shipped a full-stack Java/AI platform end-to-end within 48 hours. Reached national finalist stage among hundreds of teams.</p>
+      </div>
+      <div class="award-card glass-card reveal">
+        <div class="award-icon">🛡️</div>
+        <div class="award-title">Round 2 National Qualifier</div>
+        <div class="award-event">Cyber Guard AI Hackathon 2025</div>
+        <p class="award-desc">Shortlisted nationally for the I4C/MHA Cyber Guard AI Hackathon. Presented cybercrime NLP classifier to government cybersecurity stakeholders in New Delhi.</p>
+      </div>
+      <div class="award-card glass-card reveal">
+        <div class="award-icon">🎓</div>
+        <div class="award-title">Crash Course on Python</div>
+        <div class="award-event">Google / Coursera Certification</div>
+        <p class="award-desc">Completed Google's official Python certification on Coursera, covering data structures, OOP, and automation scripting fundamentals.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- CONTACT -->
+<section id="contact">
+  <canvas id="contact-canvas"></canvas>
+  <div class="contact-content">
+    <div class="section-eyebrow" style="justify-content:center; margin-bottom:20px;">06 — Connect</div>
+    <h2 class="contact-title">Let's Build</h2>
+    <p class="contact-sub">
+      Open to full-time software engineering roles. Ready to relocate. Let's engineer something exceptional together.
+    </p>
+    <div class="contact-links">
+      <a href="mailto:sakthivelr1679@gmail.com" class="contact-link glass-card">
+        <span class="cl-icon">✉️</span> Email
+      </a>
+      <a href="https://github.com/Sakthi-1679" target="_blank" class="contact-link glass-card">
+        <span class="cl-icon">🐙</span> GitHub
+      </a>
+      <a href="https://linkedin.com/in/sakthivel-r72a15232" target="_blank" class="contact-link glass-card">
+        <span class="cl-icon">💼</span> LinkedIn
+      </a>
+      <a href="Sakthivel_R_Resume_Java.pdf" download="Sakthivel_R_Resume_Java.pdf" class="contact-link glass-card">
+        <span class="cl-icon">📄</span> Resume
+      </a>
+      <a href="https://portfolio-14b57.web.app" target="_blank" class="contact-link glass-card">
+        <span class="cl-icon">🌐</span> Portfolio
+      </a>
+    </div>
+    <div class="contact-info">📍 <span>Tamil Nadu, India</span> — Open to Relocate</div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-logo">SAKTHIVEL R</div>
+  <div class="footer-copy">© 2026 · Software Engineer · AI Engineer · Full-Stack Developer</div>
+</footer>
+
+<script>
+// =============================================
+// LOADER
+// =============================================
+const loaderMessages = [
+  'Initializing Systems...', 'Loading Neural Networks...', 'Compiling Experience...', 'Rendering Universe...'
+];
+let msgIdx = 0;
+const loaderStatus = document.getElementById('loader-status');
+const msgInterval = setInterval(() => {
+  msgIdx = (msgIdx + 1) % loaderMessages.length;
+  loaderStatus.textContent = loaderMessages[msgIdx];
+}, 500);
+
+window.addEventListener('load', () => {
+  clearInterval(msgInterval);
+  setTimeout(() => {
+    document.getElementById('loader').classList.add('hidden');
+  }, 2200);
+});
+
+// =============================================
+// SHARED PERF HELPER: pause/resume any rAF loop when its element
+// (or the page tab) isn't visible. Cuts CPU/GPU cost to ~0 when off-screen.
+// =============================================
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function gatedAnimationLoop(el, frameFn) {
+  let running = false;
+  let rafId = null;
+
+  function frame(t) {
+    if (!running) return;
+    frameFn(t);
+    rafId = requestAnimationFrame(frame);
+  }
+  function start() {
+    if (running || prefersReducedMotion) return;
+    running = true;
+    rafId = requestAnimationFrame(frame);
+  }
+  function stop() {
+    running = false;
+    if (rafId) cancelAnimationFrame(rafId);
+  }
+
+  const io = new IntersectionObserver(([entry]) => {
+    if (entry.isIntersecting) start(); else stop();
+  }, { threshold: 0 });
+  io.observe(el);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stop(); else if (el.getBoundingClientRect().top < innerHeight) start();
+  });
+
+  return { start, stop };
+}
+
+// =============================================
+// CURSOR (cheap — one point, left running)
+// =============================================
+const cursor = document.getElementById('cursor');
+const cursorRing = document.getElementById('cursor-ring');
+let mouseX = 0, mouseY = 0, ringX = 0, ringY = 0;
+
+document.addEventListener('mousemove', e => {
+  mouseX = e.clientX; mouseY = e.clientY;
+  cursor.style.left = mouseX - 6 + 'px';
+  cursor.style.top = mouseY - 6 + 'px';
+}, { passive: true });
+
+function animateCursor() {
+  ringX += (mouseX - ringX - 20) * 0.12;
+  ringY += (mouseY - ringY - 20) * 0.12;
+  cursorRing.style.left = ringX + 'px';
+  cursorRing.style.top = ringY + 'px';
+  requestAnimationFrame(animateCursor);
+}
+if (!prefersReducedMotion) animateCursor();
+
+document.querySelectorAll('a, button, .glass-card, .skill-chip').forEach(el => {
+  el.addEventListener('mouseenter', () => {
+    cursor.style.transform = 'scale(2)';
+    cursorRing.style.width = '60px';
+    cursorRing.style.height = '60px';
+  });
+  el.addEventListener('mouseleave', () => {
+    cursor.style.transform = 'scale(1)';
+    cursorRing.style.width = '40px';
+    cursorRing.style.height = '40px';
+  });
+});
+
+// =============================================
+// SCROLL-DRIVEN 3D HERO TILT (CSS transform only — compositor thread,
+// no layout/paint cost). rAF-coalesced so it never runs more than once/frame.
+// =============================================
+const heroTiltLayer = document.getElementById('heroTiltLayer');
+let tiltTicking = false;
+
+function updateHeroTilt() {
+  const progress = Math.min(window.scrollY / window.innerHeight, 1); // 0 → 1 over first viewport
+  if (heroTiltLayer && !prefersReducedMotion) {
+    const rotateX = progress * 10;
+    const translateZ = progress * -60;
+    const opacity = 1 - progress * 0.6;
+    heroTiltLayer.style.transform = `rotateX(${rotateX}deg) translateZ(${translateZ}px)`;
+    heroTiltLayer.style.opacity = opacity;
+  }
+  tiltTicking = false;
+}
+window.addEventListener('scroll', () => {
+  if (!tiltTicking) { requestAnimationFrame(updateHeroTilt); tiltTicking = true; }
+}, { passive: true });
+updateHeroTilt();
+
+// =============================================
+// REAL-TIME 3D BACKGROUND
+// Tries Three.js (WebGL, GPU-instanced field, one draw call) first.
+// Falls back to a lightweight 2D canvas only if WebGL is unavailable.
+// =============================================
+let mouse = { x: 0, y: 0 };
+document.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; }, { passive: true });
+
+function webglSupported() {
+  try {
+    const c = document.createElement('canvas');
+    return !!(window.WebGLRenderingContext && (c.getContext('webgl') || c.getContext('experimental-webgl')));
+  } catch (e) { return false; }
+}
+
+async function startThreeBg() {
+  const THREE = await import('three');
+  const canvas = document.getElementById('bg-canvas-3d');
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // never render >2x, no visual gain, real GPU cost
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 100);
+  camera.position.z = 12;
+
+  const COUNT = 220;
+  const geometry = new THREE.IcosahedronGeometry(0.045, 0);
+  const material = new THREE.MeshBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.55 });
+  const field = new THREE.InstancedMesh(geometry, material, COUNT);
+
+  const purpleMaterial = new THREE.MeshBasicMaterial({ color: 0xa855f7, transparent: true, opacity: 0.45 });
+  const purpleGeometry = new THREE.IcosahedronGeometry(0.03, 0);
+  const purpleField = new THREE.InstancedMesh(purpleGeometry, purpleMaterial, Math.round(COUNT * 0.4));
+
+  const dummy = new THREE.Object3D();
+  for (let i = 0; i < COUNT; i++) {
+    dummy.position.set((Math.random() - 0.5) * 18, (Math.random() - 0.5) * 11, (Math.random() - 0.5) * 8);
+    dummy.updateMatrix();
+    field.setMatrixAt(i, dummy.matrix);
+  }
+  for (let i = 0; i < purpleField.count; i++) {
+    dummy.position.set((Math.random() - 0.5) * 18, (Math.random() - 0.5) * 11, (Math.random() - 0.5) * 8);
+    dummy.updateMatrix();
+    purpleField.setMatrixAt(i, dummy.matrix);
+  }
+  scene.add(field, purpleField);
+
+  function resize() {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  }
+  window.addEventListener('resize', resize, { passive: true });
+  resize();
+
+  const clock = new THREE.Clock();
+  const bgLoop = gatedAnimationLoop(canvas, () => {
+    const t = clock.getElapsedTime();
+    // Ambient rotation — one matrix update per group, not per-particle physics
+    field.rotation.y = t * 0.03;
+    field.rotation.x = Math.sin(t * 0.05) * 0.1;
+    purpleField.rotation.y = -t * 0.02;
+    // Subtle parallax toward the cursor, coalesced into the same frame
+    camera.position.x += ((mouse.x - innerWidth / 2) * 0.0006 - camera.position.x) * 0.05;
+    camera.position.y += ((-(mouse.y - innerHeight / 2)) * 0.0006 - camera.position.y) * 0.05;
+    camera.lookAt(0, 0, 0);
+    renderer.render(scene, camera);
+  });
+  bgLoop.start();
+  canvas.style.display = 'block';
+
+  window.addEventListener('beforeunload', () => {
+    field.geometry.dispose(); field.material.dispose();
+    purpleField.geometry.dispose(); purpleField.material.dispose();
+    renderer.dispose();
+  });
+}
+
+function startLegacyBg() {
+  // Lightweight 2D fallback for browsers without WebGL — reduced particle
+  // count + squared-distance early-exit keeps this cheap even without a GPU.
+  const bgCanvas = document.getElementById('bg-canvas');
+  bgCanvas.style.display = 'block';
+  const bgCtx = bgCanvas.getContext('2d');
+  let bgW, bgH;
+
+  function resizeBg() {
+    bgW = bgCanvas.width = window.innerWidth;
+    bgH = bgCanvas.height = window.innerHeight;
+  }
+  resizeBg();
+  window.addEventListener('resize', resizeBg, { passive: true });
+
+  const particles = [];
+  const PARTICLE_COUNT = 70; // was 180 — quadratic connection cost, so this alone is ~6x cheaper
+  const CONNECT_DIST = 100, CONNECT_DIST_SQ = CONNECT_DIST * CONNECT_DIST;
+
+  class BgParticle {
+    constructor() { this.reset(); }
+    reset() {
+      this.x = Math.random() * bgW; this.y = Math.random() * bgH;
+      this.vx = (Math.random() - 0.5) * 0.4; this.vy = (Math.random() - 0.5) * 0.4;
+      this.r = Math.random() * 1.5 + 0.3;
+      this.alpha = Math.random() * 0.6 + 0.1;
+      this.color = Math.random() > 0.6 ? '#00d4ff' : Math.random() > 0.5 ? '#a855f7' : '#ffffff';
+    }
+    update() {
+      const dx = mouse.x - this.x, dy = mouse.y - this.y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq < 22500) { // 150px radius, no sqrt needed for the threshold check
+        const dist = Math.sqrt(distSq) || 1;
+        this.vx -= dx / dist * 0.02; this.vy -= dy / dist * 0.02;
+      }
+      this.vx *= 0.99; this.vy *= 0.99;
+      this.x += this.vx; this.y += this.vy;
+      if (this.x < 0 || this.x > bgW || this.y < 0 || this.y > bgH) this.reset();
+    }
+    draw(ctx) {
+      ctx.save();
+      ctx.globalAlpha = this.alpha;
+      ctx.fillStyle = this.color;
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+  for (let i = 0; i < PARTICLE_COUNT; i++) particles.push(new BgParticle());
+
+  function drawConnections(ctx) {
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x, dy = particles[i].y - particles[j].y;
+        const dSq = dx * dx + dy * dy;
+        if (dSq < CONNECT_DIST_SQ) { // avoid sqrt for the vast majority of pairs that fail this check
+          const d = Math.sqrt(dSq);
+          ctx.save();
+          ctx.globalAlpha = (1 - d / CONNECT_DIST) * 0.12;
+          ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 0.5;
+          ctx.beginPath(); ctx.moveTo(particles[i].x, particles[i].y); ctx.lineTo(particles[j].x, particles[j].y); ctx.stroke();
+          ctx.restore();
+        }
+      }
+    }
+  }
+
+  const bgLoop = gatedAnimationLoop(bgCanvas, () => {
+    bgCtx.clearRect(0, 0, bgW, bgH);
+    drawConnections(bgCtx);
+    particles.forEach(p => { p.update(); p.draw(bgCtx); });
+  });
+  bgLoop.start();
+}
+
+if (webglSupported() && !prefersReducedMotion) {
+  startThreeBg().catch(() => startLegacyBg()); // network/CDN failure → graceful fallback
+} else {
+  startLegacyBg();
+}
+
+// =============================================
+// SKILLS CANVAS
+// =============================================
+const skills = [
+  { name: 'Java', pct: 90, color: '#f89820' },
+  { name: 'Spring Boot', pct: 82, color: '#6db33f' },
+  { name: 'Python', pct: 85, color: '#ffd43b' },
+  { name: 'React', pct: 78, color: '#61dafb' },
+  { name: 'Node.js', pct: 76, color: '#68a063' },
+  { name: 'SQL/MySQL', pct: 80, color: '#00d4ff' },
+  { name: 'Docker', pct: 72, color: '#2496ed' },
+  { name: 'TensorFlow', pct: 75, color: '#ff6f00' },
+  { name: 'scikit-learn', pct: 78, color: '#f7931e' },
+  { name: 'FastAPI', pct: 74, color: '#009688' },
+  { name: 'GCP', pct: 68, color: '#4285f4' },
+  { name: 'Git/GitHub', pct: 88, color: '#f05032' },
+  { name: 'GitHub Actions', pct: 70, color: '#a855f7' },
+  { name: 'Linux', pct: 72, color: '#fcc624' },
+  { name: 'OpenCV', pct: 70, color: '#00fff5' },
+];
+
+// Skill chips
+const skillsDetail = document.querySelector('.skills-detail');
+skills.forEach(s => {
+  const chip = document.createElement('div');
+  chip.className = 'skill-chip glass-card';
+  chip.innerHTML = `
+    <div class="skill-chip-name">${s.name}</div>
+    <div class="skill-chip-bar"><div class="skill-chip-fill" data-pct="${s.pct/100}" style="background: linear-gradient(90deg, ${s.color}, #a855f7)"></div></div>
+    <div class="skill-chip-pct">${s.pct}%</div>
+  `;
+  skillsDetail.appendChild(chip);
+});
+
+// Skills canvas — floating orb visualization
+const sc = document.getElementById('skills-canvas');
+const sctx = sc.getContext('2d');
+let scW, scH;
+
+function resizeSc() {
+  scW = sc.width = sc.parentElement.offsetWidth;
+  scH = sc.height = sc.parentElement.offsetHeight;
+  initSkillOrbs();
+}
+
+let skillOrbs = [];
+function initSkillOrbs() {
+  skillOrbs = skills.map((s, i) => {
+    const angle = (i / skills.length) * Math.PI * 2;
+    const radius = Math.min(scW, scH) * 0.32;
+    return {
+      ...s,
+      x: scW/2 + Math.cos(angle) * radius * (0.6 + Math.random()*0.4),
+      y: scH/2 + Math.sin(angle) * radius * (0.6 + Math.random()*0.4),
+      vx: (Math.random()-0.5)*0.3, vy: (Math.random()-0.5)*0.3,
+      r: 6 + s.pct * 0.18,
+      baseR: 6 + s.pct * 0.18,
+      hovered: false,
+      phase: Math.random() * Math.PI * 2,
+      angle: angle
+    };
+  });
+}
+
+resizeSc();
+window.addEventListener('resize', resizeSc);
+
+let scMouse = { x: -9999, y: -9999 };
+sc.parentElement.addEventListener('mousemove', e => {
+  const rect = sc.getBoundingClientRect();
+  scMouse.x = e.clientX - rect.left;
+  scMouse.y = e.clientY - rect.top;
+});
+sc.parentElement.addEventListener('mouseleave', () => { scMouse.x = scMouse.y = -9999; });
+
+function animateSc(t) {
+  sctx.clearRect(0, 0, scW, scH);
+
+  // Draw connections
+  skillOrbs.forEach((a, i) => {
+    skillOrbs.forEach((b, j) => {
+      if (j <= i) return;
+      const dx = a.x - b.x, dy = a.y - b.y;
+      const d = Math.sqrt(dx*dx + dy*dy);
+      if (d < 180) {
+        sctx.save();
+        sctx.globalAlpha = (1 - d/180) * 0.15;
+        sctx.strokeStyle = '#00d4ff';
+        sctx.lineWidth = 1;
+        sctx.beginPath(); sctx.moveTo(a.x, a.y); sctx.lineTo(b.x, b.y); sctx.stroke();
+        sctx.restore();
+      }
+    });
+  });
+
+  skillOrbs.forEach(o => {
+    // Soft float
+    o.x += o.vx + Math.sin(t/1200 + o.phase) * 0.3;
+    o.y += o.vy + Math.cos(t/1400 + o.phase) * 0.3;
+    o.vx *= 0.98; o.vy *= 0.98;
+
+    // Bounds
+    const margin = o.r + 10;
+    if (o.x < margin) o.vx += 0.2;
+    if (o.x > scW - margin) o.vx -= 0.2;
+    if (o.y < margin) o.vy += 0.2;
+    if (o.y > scH - margin) o.vy -= 0.2;
+
+    // Hover
+    const dx = scMouse.x - o.x, dy = scMouse.y - o.y;
+    const d = Math.sqrt(dx*dx + dy*dy);
+    o.hovered = d < o.r + 20;
+    const targetR = o.hovered ? o.baseR * 1.5 : o.baseR;
+    o.r += (targetR - o.r) * 0.1;
+
+    // Draw orb
+    const grd = sctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r);
+    grd.addColorStop(0, o.color + 'cc');
+    grd.addColorStop(0.5, o.color + '44');
+    grd.addColorStop(1, o.color + '00');
+    sctx.beginPath();
+    sctx.arc(o.x, o.y, o.r, 0, Math.PI*2);
+    sctx.fillStyle = grd;
+    sctx.fill();
+
+    // Ring
+    sctx.beginPath();
+    sctx.arc(o.x, o.y, o.r * 0.55, 0, Math.PI*2);
+    sctx.strokeStyle = o.color + (o.hovered ? 'ff' : '88');
+    sctx.lineWidth = o.hovered ? 2 : 1;
+    sctx.stroke();
+
+    // Label
+    sctx.save();
+    sctx.globalAlpha = o.hovered ? 1 : 0.7;
+    sctx.fillStyle = '#ffffff';
+    sctx.font = `${o.hovered ? 600 : 400} ${Math.max(10, o.r * 0.6)}px 'Space Grotesk', sans-serif`;
+    sctx.textAlign = 'center';
+    sctx.textBaseline = 'middle';
+    sctx.fillText(o.name, o.x, o.y);
+
+    if (o.hovered) {
+      sctx.font = `500 11px 'JetBrains Mono', monospace`;
+      sctx.fillStyle = o.color;
+      sctx.fillText(o.pct + '%', o.x, o.y + o.r * 0.65 + 12);
+    }
+    sctx.restore();
+  });
+
+  requestAnimationFrame(animateSc);
+}
+requestAnimationFrame(animateSc);
+
+// =============================================
+// PROJECT CANVASES
+// =============================================
+function makeProjectCanvas(id, drawFn) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let w, h;
+  function resize() {
+    w = canvas.width = canvas.offsetWidth;
+    h = canvas.height = canvas.offsetHeight;
+  }
+  resize();
+
+  let t = 0;
+  function loop() {
+    ctx.clearRect(0, 0, w, h);
+    drawFn(ctx, w, h, t++);
+    requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+// P1: Cybercrime — neon network / data streams
+makeProjectCanvas('proj-canvas-1', (ctx, w, h, t) => {
+  ctx.fillStyle = 'rgba(0,4,12,0.85)';
+  ctx.fillRect(0, 0, w, h);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(0,212,255,0.06)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < w; x += 30) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+  for (let y = 0; y < h; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+
+  // Neural nodes
+  const nodes = [
+    {x:0.15,y:0.3}, {x:0.3,y:0.6}, {x:0.5,y:0.25}, {x:0.5,y:0.7},
+    {x:0.7,y:0.4}, {x:0.85,y:0.2}, {x:0.85,y:0.7}, {x:0.2,y:0.8}
+  ];
+  const edges = [[0,2],[0,1],[1,3],[2,4],[3,4],[4,5],[4,6],[1,7]];
+
+  edges.forEach(([a,b]) => {
+    const ax = nodes[a].x*w, ay = nodes[a].y*h;
+    const bx = nodes[b].x*w, by = nodes[b].y*h;
+    // Animated pulse
+    const prog = ((t * 1.5 + a * 40) % 120) / 120;
+    const px = ax + (bx-ax)*prog, py = ay + (by-ay)*prog;
+
+    ctx.strokeStyle = 'rgba(0,212,255,0.25)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+
+    ctx.beginPath(); ctx.arc(px,py,3,0,Math.PI*2);
+    ctx.fillStyle = '#00d4ff'; ctx.shadowBlur = 10; ctx.shadowColor = '#00d4ff';
+    ctx.fill(); ctx.shadowBlur = 0;
+  });
+
+  nodes.forEach((n,i) => {
+    const pulse = Math.sin(t/30 + i) * 3;
+    const r = 7 + pulse;
+    ctx.beginPath(); ctx.arc(n.x*w, n.y*h, r, 0, Math.PI*2);
+    const g = ctx.createRadialGradient(n.x*w,n.y*h,0,n.x*w,n.y*h,r*2);
+    g.addColorStop(0,'rgba(0,212,255,0.9)'); g.addColorStop(1,'rgba(0,212,255,0)');
+    ctx.fillStyle = g; ctx.fill();
+  });
+
+  // Text streams
+  ctx.font = '9px JetBrains Mono, monospace';
+  ctx.fillStyle = 'rgba(0,212,255,0.3)';
+  const labels = ['CLASSIFY', 'NLP', '90%', 'TF-IDF', 'PREDICT'];
+  labels.forEach((l,i) => {
+    const x = (i/labels.length)*w*0.8 + 20;
+    const y = (Math.sin(t/60 + i) * 0.1 + 0.5) * h;
+    ctx.fillText(l, x, y);
+  });
+});
+
+// P2: Emotion/ECG — waveform
+makeProjectCanvas('proj-canvas-2', (ctx, w, h, t) => {
+  ctx.fillStyle = 'rgba(2,8,20,0.88)';
+  ctx.fillRect(0, 0, w, h);
+
+  // Soft glow bg
+  const cg = ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,h*0.5);
+  cg.addColorStop(0,'rgba(168,85,247,0.06)'); cg.addColorStop(1,'transparent');
+  ctx.fillStyle = cg; ctx.fillRect(0,0,w,h);
+
+  // ECG-style wave
+  ctx.beginPath();
+  ctx.strokeStyle = '#a855f7'; ctx.lineWidth = 2;
+  ctx.shadowBlur = 12; ctx.shadowColor = '#a855f7';
+  for (let x = 0; x < w; x++) {
+    const phase = (x / w * 4 * Math.PI) + t/30;
+    let y = h/2 + Math.sin(phase) * 30;
+    if ((x % (w/4)) > (w/4)*0.6 && (x % (w/4)) < (w/4)*0.65) y = h/2 - 70;
+    if ((x % (w/4)) > (w/4)*0.65 && (x % (w/4)) < (w/4)*0.7) y = h/2 + 40;
+    if ((x % (w/4)) > (w/4)*0.7 && (x % (w/4)) < (w/4)*0.75) y = h/2;
+    if (x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke(); ctx.shadowBlur = 0;
+
+  // CNN layers representation
+  const layers = [0.2, 0.38, 0.56, 0.74, 0.88];
+  layers.forEach((lx, li) => {
+    const x = lx * w;
+    const lh = 20 + li * 10;
+    for (let i = -2; i <= 2; i++) {
+      const y = h/2 + i * (lh/2);
+      const alpha = 0.3 + Math.sin(t/40 + li) * 0.2;
+      ctx.fillStyle = `rgba(0,255,245,${alpha})`;
+      ctx.fillRect(x-2, y-3, 4, 6);
+    }
+  });
+
+  // Labels
+  ctx.font = 'bold 11px Space Grotesk';
+  ctx.fillStyle = 'rgba(168,85,247,0.7)';
+  ['CNN', 'POOL', 'DENSE', 'SOFTMAX', 'OUT'].forEach((l,i) => {
+    ctx.fillText(l, layers[i]*w - 12, h - 16);
+  });
+});
+
+// P3: E-learning — clean data dashboard
+makeProjectCanvas('proj-canvas-3', (ctx, w, h, t) => {
+  ctx.fillStyle = 'rgba(2,10,18,0.88)';
+  ctx.fillRect(0, 0, w, h);
+
+  const cg = ctx.createRadialGradient(w*0.7,h*0.3,0,w*0.7,h*0.3,w*0.5);
+  cg.addColorStop(0,'rgba(0,212,255,0.05)'); cg.addColorStop(1,'transparent');
+  ctx.fillStyle = cg; ctx.fillRect(0,0,w,h);
+
+  // Bar chart simulation
+  const bars = [0.45, 0.72, 0.58, 0.89, 0.65, 0.94, 0.78];
+  const bw = (w*0.55) / (bars.length * 1.4);
+  bars.forEach((v, i) => {
+    const bh = v * h * 0.55 * (0.9 + Math.sin(t/60+i)*0.1);
+    const x = w*0.08 + i * bw * 1.4;
+    const y = h * 0.82 - bh;
+    const g = ctx.createLinearGradient(0,y,0,y+bh);
+    g.addColorStop(0,'rgba(0,212,255,0.9)');
+    g.addColorStop(1,'rgba(0,212,255,0.1)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, bw, bh);
+  });
+
+  // Baseline
+  ctx.strokeStyle = 'rgba(0,212,255,0.2)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(w*0.06, h*0.82); ctx.lineTo(w*0.92, h*0.82); ctx.stroke();
+
+  // Razorpay / auth badges
+  const badges = ['✓ OAuth', '✓ Payments', '✓ GCP', '✓ Live'];
+  badges.forEach((b,i) => {
+    const x = w*0.62 + (i%2)*w*0.18;
+    const y = h*0.18 + Math.floor(i/2)*40;
+    const pulse = 0.6 + Math.sin(t/40 + i)*0.3;
+    ctx.fillStyle = `rgba(0,255,136,${pulse*0.15})`;
+    ctx.strokeStyle = `rgba(0,255,136,${pulse*0.6})`;
+    ctx.lineWidth = 1;
+    const bw2 = 90, bh2 = 26;
+    ctx.fillRect(x, y, bw2, bh2);
+    ctx.strokeRect(x, y, bw2, bh2);
+    ctx.fillStyle = `rgba(0,255,136,${pulse})`;
+    ctx.font = '10px JetBrains Mono';
+    ctx.fillText(b, x+10, y+17);
+  });
+});
+
+// =============================================
+// CONTACT CANVAS — starfield + planet
+// =============================================
+const contactCanvas = document.getElementById('contact-canvas');
+const cctx = contactCanvas.getContext('2d');
+let ccW, ccH;
+
+function resizeCc() {
+  ccW = contactCanvas.width = contactCanvas.offsetWidth;
+  ccH = contactCanvas.height = contactCanvas.offsetHeight;
+}
+
+const contactSection = document.getElementById('contact');
+resizeCc();
+window.addEventListener('resize', resizeCc);
+
+const stars = Array.from({length: 200}, () => ({
+  x: Math.random(), y: Math.random(),
+  r: Math.random() * 1.5 + 0.3,
+  alpha: Math.random() * 0.7 + 0.3,
+  twinkle: Math.random() * Math.PI * 2
+}));
+
+let ccT = 0;
+function animateCc() {
+  cctx.clearRect(0, 0, ccW, ccH);
+
+  // Stars
+  stars.forEach(s => {
+    const a = s.alpha * (0.7 + Math.sin(ccT/60 + s.twinkle) * 0.3);
+    cctx.save();
+    cctx.globalAlpha = a;
+    cctx.fillStyle = '#ffffff';
+    cctx.beginPath();
+    cctx.arc(s.x*ccW, s.y*ccH, s.r, 0, Math.PI*2);
+    cctx.fill();
+    cctx.restore();
+  });
+
+  // Planet
+  const px = ccW/2, py = ccH * 0.35, pr = Math.min(ccW, ccH) * 0.12;
+  const pg = cctx.createRadialGradient(px-pr*0.3,py-pr*0.3,0,px,py,pr);
+  pg.addColorStop(0,'rgba(0,180,220,0.3)');
+  pg.addColorStop(0.5,'rgba(0,100,180,0.15)');
+  pg.addColorStop(1,'rgba(0,50,100,0.05)');
+  cctx.beginPath(); cctx.arc(px, py, pr, 0, Math.PI*2);
+  cctx.fillStyle = pg; cctx.fill();
+
+  // Planet ring
+  cctx.save();
+  cctx.translate(px, py);
+  cctx.scale(1, 0.3);
+  cctx.beginPath();
+  cctx.arc(0, 0, pr*1.6, 0, Math.PI*2);
+  cctx.strokeStyle = 'rgba(0,212,255,0.2)'; cctx.lineWidth = 6;
+  cctx.stroke();
+  cctx.restore();
+
+  // Orbiting dots
+  const orbColors = ['#00d4ff','#a855f7','#00ff88','#ffd43b'];
+  orbColors.forEach((c,i) => {
+    const angle = ccT/120 + (i/orbColors.length)*Math.PI*2;
+    const or = pr * 2.2;
+    const ox = px + Math.cos(angle)*or;
+    const oy = py + Math.sin(angle)*or*0.35;
+    cctx.beginPath(); cctx.arc(ox, oy, 5, 0, Math.PI*2);
+    cctx.fillStyle = c; cctx.shadowBlur = 12; cctx.shadowColor = c;
+    cctx.fill(); cctx.shadowBlur = 0;
+  });
+
+  ccT++;
+  requestAnimationFrame(animateCc);
+}
+animateCc();
+
+// =============================================
+// SCROLL REVEAL
+// =============================================
+const revealEls = document.querySelectorAll('.reveal');
+const timelineItems = document.querySelectorAll('.timeline-item');
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.15 });
+
+revealEls.forEach(el => observer.observe(el));
+timelineItems.forEach(el => observer.observe(el));
+
+// =============================================
+// COUNTER ANIMATION
+// =============================================
+const counters = document.querySelectorAll('[data-count]');
+const counterObs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting && !e.target.dataset.done) {
+      e.target.dataset.done = '1';
+      const target = parseInt(e.target.dataset.count);
+      let current = 0;
+      const step = target / 60;
+      const interval = setInterval(() => {
+        current = Math.min(current + step, target);
+        e.target.textContent = Math.round(current) + (target > 9 ? '+' : '');
+        if (current >= target) clearInterval(interval);
+      }, 20);
+    }
+  });
+}, { threshold: 0.5 });
+
+counters.forEach(c => counterObs.observe(c));
+
+// =============================================
+// SKILL BARS ANIMATION
+// =============================================
+const skillBars = document.querySelectorAll('.skill-chip-fill');
+const barObs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.style.transform = `scaleX(${e.target.dataset.pct})`;
+      barObs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.1 });
+skillBars.forEach(b => barObs.observe(b));
+
+// =============================================
+// SMOOTH SCROLL
+// =============================================
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    const target = document.querySelector(a.getAttribute('href'));
+    if (target) { e.preventDefault(); target.scrollIntoView({ behavior: 'smooth' }); }
+  });
+});
+</script>
+</body>
+</html>
