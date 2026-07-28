@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.firebase/
+.firebaserc
+firebase.json
+.agents/
+portfolio/
+public_deploy/
+firebase-debug.log*
+Sakthivel_R_JavaDeveloper.pdf
+Sakthivel_R_Resume_Java.pdf
+WhatsApp Image 2026-05-27 at 5.38.15 PM.jpeg
